@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# IntelliJ
+.idea/
+*.iml
+out/
+
+# Backend
+mhwbuilder-backend/.gradle/
+mhwbuilder-backend/build/
+mhwbuilder-backend/*.log
+
+# Frontend
+mhwbuilder-frontend/node_modules/
+mhwbuilder-frontend/dist/
+
+# DB
+*.mv.db
+*.trace.db
+
+# env
+.env

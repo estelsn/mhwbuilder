@@ -1,5 +1,7 @@
 package io.MHWilds.mhwbuilder.crawler.equipment;
 
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawCharmDto;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawEquipSkillDto;
 import io.MHWilds.mhwbuilder.domain.equipment.entity.Charm;
 import io.MHWilds.mhwbuilder.domain.equipment.repository.CharmRepository;
 import io.MHWilds.mhwbuilder.domain.skill.entity.EquipSkill;

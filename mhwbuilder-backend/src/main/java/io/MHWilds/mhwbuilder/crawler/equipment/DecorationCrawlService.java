@@ -2,6 +2,8 @@ package io.MHWilds.mhwbuilder.crawler.equipment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawDecorationDto;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawEquipSkillDto;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.text.StringEscapeUtils;
 import org.jsoup.Jsoup;

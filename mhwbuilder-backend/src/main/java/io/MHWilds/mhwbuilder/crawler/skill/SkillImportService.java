@@ -1,5 +1,7 @@
 package io.MHWilds.mhwbuilder.crawler.skill;
 
+import io.MHWilds.mhwbuilder.crawler.skill.dto.RawSeriesSkillDto;
+import io.MHWilds.mhwbuilder.crawler.skill.dto.RawSkillDto;
 import io.MHWilds.mhwbuilder.domain.skill.entity.SeriesSkill;
 import io.MHWilds.mhwbuilder.domain.skill.entity.SeriesSkillEffect;
 import io.MHWilds.mhwbuilder.domain.skill.entity.Skill;
@@ -12,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service

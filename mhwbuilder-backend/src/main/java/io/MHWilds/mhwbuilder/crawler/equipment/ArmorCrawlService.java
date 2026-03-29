@@ -2,6 +2,7 @@ package io.MHWilds.mhwbuilder.crawler.equipment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.*;
 import io.MHWilds.mhwbuilder.domain.skill.repository.SkillRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.text.StringEscapeUtils;

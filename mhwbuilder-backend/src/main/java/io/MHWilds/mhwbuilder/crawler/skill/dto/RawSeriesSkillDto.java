@@ -1,4 +1,4 @@
-package io.MHWilds.mhwbuilder.crawler.skill;
+package io.MHWilds.mhwbuilder.crawler.skill.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

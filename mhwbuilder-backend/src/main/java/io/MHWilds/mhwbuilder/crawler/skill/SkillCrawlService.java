@@ -2,6 +2,8 @@ package io.MHWilds.mhwbuilder.crawler.skill;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.MHWilds.mhwbuilder.crawler.skill.dto.RawSeriesSkillDto;
+import io.MHWilds.mhwbuilder.crawler.skill.dto.RawSkillDto;
 import org.apache.commons.text.StringEscapeUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;

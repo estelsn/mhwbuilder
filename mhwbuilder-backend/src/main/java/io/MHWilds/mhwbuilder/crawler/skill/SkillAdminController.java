@@ -1,7 +1,7 @@
 package io.MHWilds.mhwbuilder.crawler.skill;
 
+import io.MHWilds.mhwbuilder.crawler.skill.dto.RawSkillDto;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 

@@ -2,6 +2,10 @@ package io.MHWilds.mhwbuilder.crawler.equipment;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawArmorDto;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawElementalDto;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawEquipSkillDto;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawSetSkillDto;
 import io.MHWilds.mhwbuilder.domain.equipment.entity.Armor;
 import io.MHWilds.mhwbuilder.domain.equipment.repository.ArmorRepository;
 import io.MHWilds.mhwbuilder.domain.skill.entity.EquipSeriesSkill;

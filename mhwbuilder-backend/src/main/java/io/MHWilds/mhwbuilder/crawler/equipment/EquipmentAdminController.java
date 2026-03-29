@@ -1,5 +1,8 @@
 package io.MHWilds.mhwbuilder.crawler.equipment;
 
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawArmorDto;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawCharmDto;
+import io.MHWilds.mhwbuilder.crawler.equipment.dto.RawDecorationDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

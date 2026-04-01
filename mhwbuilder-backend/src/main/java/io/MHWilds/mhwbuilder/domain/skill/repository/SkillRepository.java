@@ -15,4 +15,6 @@ public interface SkillRepository extends JpaRepository<Skill, String> {
     List<Integer> findAllCodes();
 
     boolean existsByCode(int code);
+
+    List<Skill> findAllByOrderByNameAsc();
 }

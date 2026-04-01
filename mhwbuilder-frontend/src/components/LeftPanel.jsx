@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
+import {
+  buildRecommendRequest,
+  calculateTotalNormalSkillValue,
+  validateRecommendationInput,
+} from "../utils/recommendUtils";
 
-function LeftPanel() {
+function LeftPanel({ onRecommend = () => {} }) {
   const [skillData, setSkillData] = useState({
     normalSkills: [],
     seriesSkills: [],
@@ -21,7 +26,7 @@ function LeftPanel() {
         setSkillData(data);
       })
       .catch((err) => {
-        console.error(err);
+        alert("스킬 데이터를 불러오는 중 오류가 발생했습니다.");
       });
   }, []);
 
@@ -46,6 +51,7 @@ function LeftPanel() {
         name: skill.skillName,
         targetLevel: 1,
         maxLevel: skill.maxLevel,
+        decorationSlotLevel: skill.decorationSlotLevel ?? 0,
       },
     ]);
   };
@@ -117,6 +123,41 @@ function LeftPanel() {
     );
   };
 
+  const totalNormalSkillValue = calculateTotalNormalSkillValue(selectedTags);
+
+  const handleStartRecommendation = async () => {
+    const validation = validateRecommendationInput(selectedTags);
+
+    if (!validation.valid) {
+      alert(validation.message);
+      return;
+    }
+
+    const requestBody = buildRecommendRequest(selectedTags);
+
+    try {
+      const response = await fetch("http://localhost:8080/api/recommend", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "추천 요청에 실패했습니다.");
+      }
+
+      const data = await response.json();
+
+      onRecommend(data);
+      alert("추천 요청 성공");
+    } catch (error) {
+      alert(error.message || "추천 요청 중 오류가 발생했습니다.");
+    }
+  };
+
   const resetFilters = () => {
     setSelectedTags([]);
   };
@@ -186,7 +227,7 @@ function LeftPanel() {
               <option value="">Search Skills...</option>
               {skillData.normalSkills.map((skill) => (
                 <option key={skill.skillId} value={skill.skillId}>
-                  {skill.skillName} (최대 {skill.maxLevel})
+                  {skill.skillName} (최대 {skill.maxLevel}, 슬롯 {skill.decorationSlotLevel ?? "없음"})
                 </option>
               ))}
             </select>
@@ -273,10 +314,16 @@ function LeftPanel() {
               })}
             </div>
           </div>
+          <div className="text-xs text-[#a48c7a] mt-2">
+            현재 일반 스킬 총 밸류: {totalNormalSkillValue}
+          </div>
         </div>
 
         <div className="mt-auto pt-5 space-y-2">
-          <button className="w-full bg-gradient-to-r from-[#ffb97c] to-[#ff9100] text-[#4c2700] font-bold py-3 rounded shadow-lg text-sm">
+          <button
+            onClick={handleStartRecommendation}
+            className="w-full bg-gradient-to-r from-[#ffb97c] to-[#ff9100] text-[#4c2700] font-bold py-3 rounded shadow-lg text-sm"
+          >
             START RECOMMENDATION
           </button>
           <button

@@ -1,18 +1,20 @@
 //사용자가 실제로 보게 되는 화면의 가장 큰 단위. 메인 페이지의 구조를 작성하며, 다른 작은 컴포넌트들을 불러와서 조립하는 장소. 현재 진행 중인 프로젝트의 핵심 로직이나 라우팅 설정이 시작되는 곳
 
+import { useState } from "react";
 import Header from "./components/Header";
 import LeftPanel from "./components/LeftPanel";
 import ResultPanel from "./components/ResultPanel";
 import DetailPanel from "./components/DetailPanel";
 
 function App() {
+  const [recommendData, setRecommendData] = useState(null);
+
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1]">
       <Header />
        <main className="h-[calc(100vh-72px)] pt-[72px] flex overflow-hidden">
-        <LeftPanel />
-        <ResultPanel />
-        <DetailPanel />
+        <LeftPanel onRecommend={setRecommendData} />
+        <ResultPanel recommendData={recommendData} />
       </main>
     </div>
   );

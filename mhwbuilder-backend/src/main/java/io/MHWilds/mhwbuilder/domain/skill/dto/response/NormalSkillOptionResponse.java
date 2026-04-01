@@ -12,4 +12,5 @@ public class NormalSkillOptionResponse {
     private String skillId;
     private String skillName;
     private int maxLevel;
+    private Integer decorationSlotLevel;
 }

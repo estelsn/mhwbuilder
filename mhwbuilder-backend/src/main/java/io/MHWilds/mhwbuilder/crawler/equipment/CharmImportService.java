@@ -48,6 +48,7 @@ public class CharmImportService {
             }
             Charm savedCharm = saveCharm(rawCharm);
             saveEquipSkill(savedCharm, rawCharm, skillMap, eSkillList);
+            equipSkillRepository.saveAll(eSkillList);
             count++;
         }
 
@@ -78,7 +79,7 @@ public class CharmImportService {
         eSkill.setEquipType(EquipType.CHARM);
         eSkill.setSkill(skill);
         eSkill.setSkillLevel(rawCharm.getEquipSkill().getLevel());
-
+        System.out.println(skill.getName());
         eSkillList.add(eSkill);
     }
 

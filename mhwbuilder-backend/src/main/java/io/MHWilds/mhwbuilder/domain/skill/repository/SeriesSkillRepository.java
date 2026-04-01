@@ -12,5 +12,5 @@ public interface SeriesSkillRepository extends JpaRepository<SeriesSkill, String
 
     boolean existsByCode(int code);
 
-    List<SeriesSkill> findByTypeOrderByNameAsc(SkillCategory category);
+    List<SeriesSkill> findByCategoryOrderByNameAsc(SkillCategory category);
 }

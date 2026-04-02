@@ -1,6 +1,8 @@
 package io.MHWilds.mhwbuilder.domain.skill.repository;
 
 import io.MHWilds.mhwbuilder.domain.skill.entity.EquipSeriesSkill;
+import io.MHWilds.mhwbuilder.domain.skill.entity.EquipSkill;
+import io.MHWilds.mhwbuilder.util.entityenums.EquipType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -14,5 +16,6 @@ public interface EquipSeriesSkillRepository extends JpaRepository<EquipSeriesSki
 
     // 중복 체크용 (중요)
     boolean existsByArmor_IdAndSeriesSkill_Id(String armorId, String seriesSkillId);
+
 }
 

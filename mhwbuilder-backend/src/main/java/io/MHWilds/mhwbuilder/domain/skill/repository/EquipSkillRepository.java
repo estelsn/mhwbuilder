@@ -16,5 +16,5 @@ public interface EquipSkillRepository extends JpaRepository<EquipSkill, String> 
     List<EquipSkill> findByEquipType(EquipType equipType);
 
     boolean existsByEquipIdAndSkill_Id(String equipId, String skillId);
-
+    List<EquipSkill> findByEquipTypeAndEquipId(EquipType equipType, String equipId);
 }

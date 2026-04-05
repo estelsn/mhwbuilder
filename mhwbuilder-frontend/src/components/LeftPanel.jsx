@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   buildRecommendRequest,
   calculateTotalNormalSkillValue,
@@ -13,6 +13,14 @@ function LeftPanel({ onRecommend = () => {} }) {
   });
 
   const [selectedTags, setSelectedTags] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState({
+    visible: false,
+    type: "success",
+    message: "",
+  });
+
+  const toastTimerRef = useRef(null);
 
   useEffect(() => {
     fetch("http://localhost:8080/api/skills/select-page")
@@ -25,23 +33,48 @@ function LeftPanel({ onRecommend = () => {} }) {
       .then((data) => {
         setSkillData(data);
       })
-      .catch((err) => {
+      .catch(() => {
         alert("스킬 데이터를 불러오는 중 오류가 발생했습니다.");
       });
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = (message, type = "success") => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({
+      visible: true,
+      type,
+      message,
+    });
+
+    toastTimerRef.current = setTimeout(() => {
+      setToast((prev) => ({
+        ...prev,
+        visible: false,
+      }));
+    }, 2200);
+  };
+
   const addNormalSkill = (skillId) => {
     if (!skillId) return;
 
-    const skill = skillData.normalSkills.find(
-      (item) => item.skillId === skillId
-    );
+    const skill = skillData.normalSkills.find((item) => item.skillId === skillId);
     if (!skill) return;
 
-    const alreadyExists = selectedTags.some(
+    const exists = selectedTags.some(
       (tag) => tag.type === "normal" && tag.id === skill.skillId
     );
-    if (alreadyExists) return;
+    if (exists) return;
 
     setSelectedTags((prev) => [
       ...prev,
@@ -59,19 +92,18 @@ function LeftPanel({ onRecommend = () => {} }) {
   const addSetSkill = (setSkillId, type) => {
     if (!setSkillId) return;
 
-    const source =
+    const targetList =
       type === "series" ? skillData.seriesSkills : skillData.groupSkills;
 
-    const skill = source.find((item) => item.setSkillId === setSkillId);
+    const skill = targetList.find((item) => item.setSkillId === setSkillId);
     if (!skill) return;
 
-    const alreadyExists = selectedTags.some(
+    const exists = selectedTags.some(
       (tag) => tag.type === type && tag.id === skill.setSkillId
     );
-    if (alreadyExists) return;
+    if (exists) return;
 
-    const effects = skill.effects ?? [];
-    const firstEffect = effects[0];
+    const firstEffect = skill.effects?.[0];
 
     setSelectedTags((prev) => [
       ...prev,
@@ -80,7 +112,7 @@ function LeftPanel({ onRecommend = () => {} }) {
         type,
         name: skill.setSkillName,
         selectedRequiredCount: firstEffect?.requiredCount ?? 0,
-        effects,
+        effects: skill.effects ?? [],
       },
     ]);
   };
@@ -123,9 +155,9 @@ function LeftPanel({ onRecommend = () => {} }) {
     );
   };
 
-  const totalNormalSkillValue = calculateTotalNormalSkillValue(selectedTags);
-
   const handleStartRecommendation = async () => {
+    if (isSubmitting) return;
+
     const validation = validateRecommendationInput(selectedTags);
 
     if (!validation.valid) {
@@ -136,6 +168,8 @@ function LeftPanel({ onRecommend = () => {} }) {
     const requestBody = buildRecommendRequest(selectedTags);
 
     try {
+      setIsSubmitting(true);
+
       const response = await fetch("http://localhost:8080/api/recommend", {
         method: "POST",
         headers: {
@@ -152,185 +186,252 @@ function LeftPanel({ onRecommend = () => {} }) {
       const data = await response.json();
 
       onRecommend(data);
-      alert("추천 요청 성공");
+      showToast("추천 결과를 불러왔습니다.");
     } catch (error) {
       alert(error.message || "추천 요청 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const resetFilters = () => {
+    if (isSubmitting) return;
     setSelectedTags([]);
+    showToast("선택한 스킬을 초기화했습니다.");
   };
+
+  const setSkillTags = selectedTags.filter(
+    (tag) => tag.type === "series" || tag.type === "group"
+  );
+  const normalSkillTags = selectedTags.filter((tag) => tag.type === "normal");
+
+  const totalNormalSkillValue = calculateTotalNormalSkillValue(selectedTags);
 
   return (
     <aside className="w-[360px] bg-[#1c1b1b] border-r border-[#2a2a2a] shrink-0 overflow-hidden">
-      <div className="p-5 flex flex-col h-full">
-        <h2 className="text-lg font-bold tracking-tight mb-6 text-[#e5e2e1]">
+      <div className="relative flex h-full flex-col p-5">
+        <div
+          className={`absolute left-5 right-5 top-5 z-20 transition-all duration-200 ${
+            toast.visible
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-1 opacity-0 pointer-events-none"
+          }`}
+        >
+          <div
+            className={`rounded-lg border px-3 py-2 text-sm shadow-lg ${
+              toast.type === "success"
+                ? "border-[#5d4736] bg-[#2a241f] text-[#f3dfcf]"
+                : "border-[#6a3b3b] bg-[#2a1f1f] text-[#f1c7c7]"
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+
+        <h2 className="mb-5 text-lg font-bold tracking-tight text-[#e5e2e1]">
           스킬 선택
         </h2>
 
-        <div className="space-y-5 flex-grow overflow-y-auto pr-1">
-          <div className="space-y-2">
-            <label className="block text-[11px] font-bold tracking-widest text-[#dcc2ae] uppercase">
-              Series Skill
-            </label>
+        <div className="flex-grow overflow-y-auto pr-1">
+          <div className="space-y-3">
             <select
-              className="w-full bg-[#2a2a2a] text-[#e5e2e1] rounded-lg py-2.5 px-3 text-sm"
+              className="w-full rounded-lg border border-[#343434] bg-[#262626] px-3 py-2.5 text-sm text-[#e5e2e1] outline-none transition focus:border-[#6f5a48]"
               defaultValue=""
               onChange={(e) => {
                 addSetSkill(e.target.value, "series");
                 e.target.value = "";
               }}
             >
-              <option value="">Select Series Skill...</option>
+              <option value="">시리즈 스킬 선택</option>
               {skillData.seriesSkills.map((skill) => (
                 <option key={skill.setSkillId} value={skill.setSkillId}>
                   {skill.setSkillName}
                 </option>
               ))}
             </select>
-          </div>
 
-          <div className="space-y-2">
-            <label className="block text-[11px] font-bold tracking-widest text-[#dcc2ae] uppercase">
-              Group Skill
-            </label>
             <select
-              className="w-full bg-[#2a2a2a] text-[#e5e2e1] rounded-lg py-2.5 px-3 text-sm"
+              className="w-full rounded-lg border border-[#343434] bg-[#262626] px-3 py-2.5 text-sm text-[#e5e2e1] outline-none transition focus:border-[#6f5a48]"
               defaultValue=""
               onChange={(e) => {
                 addSetSkill(e.target.value, "group");
                 e.target.value = "";
               }}
             >
-              <option value="">Select Group Skill...</option>
+              <option value="">그룹 스킬 선택</option>
               {skillData.groupSkills.map((skill) => (
                 <option key={skill.setSkillId} value={skill.setSkillId}>
                   {skill.setSkillName}
                 </option>
               ))}
             </select>
-          </div>
 
-          <div className="space-y-2">
-            <label className="block text-[11px] font-bold tracking-widest text-[#dcc2ae] uppercase">
-              General Skill
-            </label>
             <select
-              className="w-full bg-[#2a2a2a] text-[#e5e2e1] rounded-lg py-2.5 px-3 text-sm"
+              className="w-full rounded-lg border border-[#343434] bg-[#262626] px-3 py-2.5 text-sm text-[#e5e2e1] outline-none transition focus:border-[#6f5a48]"
               defaultValue=""
               onChange={(e) => {
                 addNormalSkill(e.target.value);
                 e.target.value = "";
               }}
             >
-              <option value="">Search Skills...</option>
+              <option value="">일반 스킬 선택</option>
               {skillData.normalSkills.map((skill) => (
                 <option key={skill.skillId} value={skill.skillId}>
-                  {skill.skillName} (최대 {skill.maxLevel}, 슬롯 {skill.decorationSlotLevel ?? "없음"})
+                  {skill.skillName} (최대 {skill.maxLevel}, 슬롯{" "}
+                  {skill.decorationSlotLevel ?? "없음"})
                 </option>
               ))}
             </select>
           </div>
 
           <div className="mt-6">
-            <label className="block text-[11px] font-bold tracking-widest text-[#dcc2ae] uppercase mb-3">
-              Active Requirements
-            </label>
+            <div className="mb-3 flex items-end justify-between">
+              <div className="text-sm font-semibold text-[#e5e2e1]">
+                선택된 스킬
+              </div>
+              <div className="text-xs text-[#a48c7a]">
+                일반 스킬 밸류: {totalNormalSkillValue}
+              </div>
+            </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {selectedTags.length === 0 && (
-                <div className="col-span-2 text-sm text-[#a48c7a]">
-                  선택된 스킬이 없습니다.
+            {selectedTags.length === 0 && (
+              <div className="rounded-lg border border-dashed border-[#3b342f] bg-[#211f1e] px-3 py-4 text-sm text-[#a48c7a]">
+                아직 선택된 스킬이 없습니다.
+              </div>
+            )}
+
+            {setSkillTags.length > 0 && (
+              <div className="mb-4">
+                <div className="mb-2 text-[11px] font-semibold tracking-wide text-[#b89a84]">
+                  시리즈 / 그룹
                 </div>
-              )}
 
-              {selectedTags.map((tag) => {
-                const selectedEffect =
-                  tag.effects?.find(
-                    (effect) => effect.requiredCount === tag.selectedRequiredCount
-                  ) ?? null;
+                <div className="grid grid-cols-2 gap-2">
+                  {setSkillTags.map((tag) => {
+                    const selectedEffect =
+                      tag.effects?.find(
+                        (effect) =>
+                          effect.requiredCount === tag.selectedRequiredCount
+                      ) ?? null;
 
-                return (
-                  <div
-                    key={`${tag.type}-${tag.id}`}
-                    className="relative bg-[#353534] p-3 rounded border-l-2 border-[#ff9100] min-h-[88px]"
-                  >
-                    <p className="text-sm font-medium text-[#e5e2e1] mb-2 pr-4">
-                      {tag.name}
-                    </p>
+                    return (
+                      <div
+                        key={`${tag.type}-${tag.id}`}
+                        className="relative min-h-[88px] rounded bg-[#353534] p-3 border-l-2 border-[#ff9100]"
+                      >
+                        <p className="mb-2 pr-4 text-sm font-medium text-[#e5e2e1]">
+                          {tag.name}
+                        </p>
 
-                    {tag.type === "normal" ? (
+                        <div className="space-y-1">
+                          <select
+                            className="w-full rounded bg-[#1c1b1b] px-2 py-1 text-[11px] text-[#e5e2e1]"
+                            value={tag.selectedRequiredCount}
+                            onChange={(e) =>
+                              changeSetEffect(tag.id, tag.type, e.target.value)
+                            }
+                          >
+                            {tag.effects?.map((effect) => (
+                              <option
+                                key={effect.requiredCount}
+                                value={effect.requiredCount}
+                              >
+                                {effect.requiredCount}세트
+                              </option>
+                            ))}
+                          </select>
+
+                          <p className="text-[10px] leading-tight text-[#dcc2ae]">
+                            {selectedEffect?.effectName ?? ""}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => removeTag(tag.id, tag.type)}
+                          className="absolute right-1 top-1 text-[16px] leading-none text-[#a48c7a] hover:text-red-400"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {normalSkillTags.length > 0 && (
+              <div>
+                <div className="mb-2 text-[11px] font-semibold tracking-wide text-[#b89a84]">
+                  일반 스킬
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {normalSkillTags.map((tag) => (
+                    <div
+                      key={`${tag.type}-${tag.id}`}
+                      className="relative min-h-[88px] rounded bg-[#353534] p-3 border-l-2 border-[#ff9100]"
+                    >
+                      <p className="mb-2 pr-4 text-sm font-medium text-[#e5e2e1]">
+                        {tag.name}
+                      </p>
+
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => decreaseLevel(tag.id)}
-                          className="w-5 h-5 text-xs flex items-center justify-center bg-[#1c1b1b] hover:bg-[#2a2a2a] text-white rounded"
+                          className="flex h-5 w-5 items-center justify-center rounded bg-[#1c1b1b] text-xs text-white hover:bg-[#2a2a2a]"
                         >
                           -
                         </button>
-                        <p className="text-[10px] text-[#dcc2ae] uppercase tracking-tight min-w-[64px] text-center">
+
+                        <p className="min-w-[64px] text-center text-[10px] tracking-tight text-[#dcc2ae]">
                           Lv {tag.targetLevel}/{tag.maxLevel}
                         </p>
+
                         <button
                           onClick={() => increaseLevel(tag.id)}
-                          className="w-5 h-5 text-xs flex items-center justify-center bg-[#1c1b1b] hover:bg-[#2a2a2a] text-white rounded"
+                          className="flex h-5 w-5 items-center justify-center rounded bg-[#1c1b1b] text-xs text-white hover:bg-[#2a2a2a]"
                         >
                           +
                         </button>
                       </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <select
-                          className="w-full bg-[#1c1b1b] text-[#e5e2e1] rounded px-2 py-1 text-[11px]"
-                          value={tag.selectedRequiredCount}
-                          onChange={(e) =>
-                            changeSetEffect(tag.id, tag.type, e.target.value)
-                          }
-                        >
-                          {tag.effects?.map((effect) => (
-                            <option
-                              key={effect.requiredCount}
-                              value={effect.requiredCount}
-                            >
-                              {effect.requiredCount}세트
-                            </option>
-                          ))}
-                        </select>
 
-                        <p className="text-[10px] text-[#dcc2ae] leading-tight">
-                          {selectedEffect?.effectName ?? ""}
-                        </p>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => removeTag(tag.id, tag.type)}
-                      className="absolute top-1 right-1 text-[#a48c7a] hover:text-red-400 text-[11px] leading-none"
-                    >
-                      x
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="text-xs text-[#a48c7a] mt-2">
-            현재 일반 스킬 총 밸류: {totalNormalSkillValue}
+                      <button
+                        onClick={() => removeTag(tag.id, tag.type)}
+                        className="absolute right-1 top-1 text-[16px] leading-none text-[#a48c7a] hover:text-red-400"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-auto pt-5 space-y-2">
+        <div className="mt-auto space-y-2 pt-5">
           <button
             onClick={handleStartRecommendation}
-            className="w-full bg-gradient-to-r from-[#ffb97c] to-[#ff9100] text-[#4c2700] font-bold py-3 rounded shadow-lg text-sm"
+            disabled={isSubmitting}
+            className={`w-full rounded py-3 text-sm font-bold shadow-lg transition ${
+              isSubmitting
+                ? "cursor-not-allowed bg-[#6f573f] text-[#d8c1aa]"
+                : "bg-gradient-to-r from-[#ffb97c] to-[#ff9100] text-[#4c2700]"
+            }`}
           >
-            START RECOMMENDATION
+            {isSubmitting ? "추천 실행 중" : "추천 실행"}
           </button>
+
           <button
             onClick={resetFilters}
-            className="w-full bg-transparent border border-[#564334] text-[#e5e2e1] font-medium py-2.5 rounded hover:bg-[#353534] text-sm"
+            disabled={isSubmitting}
+            className={`w-full rounded border py-2.5 text-sm font-medium transition ${
+              isSubmitting
+                ? "cursor-not-allowed border-[#3f342d] bg-transparent text-[#8d7b6f]"
+                : "border-[#564334] bg-transparent text-[#e5e2e1] hover:bg-[#353534]"
+            }`}
           >
-            RESET FILTERS
+            초기화
           </button>
         </div>
       </div>

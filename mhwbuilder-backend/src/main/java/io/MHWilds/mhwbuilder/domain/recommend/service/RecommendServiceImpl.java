@@ -49,23 +49,23 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class RecommendServiceImpl implements RecommendService {
 
+    private static final int MAX_SET_BUNDLE_COUNT = 50;
+    private static final int MAX_COMPLETED_BUNDLE_COUNT = 20;
+    private static final int MAX_FILLED_BUNDLE_PER_BASE = 10;
+    private static final int MAX_CANDIDATE_COUNT = 30;
+    private static final int MAX_CARD_COUNT = 10;
+
+    private static final int ARMOR_SKILL_WEIGHT = 10;
+    private static final int CHARM_SKILL_WEIGHT = 15;
+
+    private static final String NO_RESULT_MESSAGE = "조건을 만족하는 세팅이 없습니다.";
+
     private final ArmorRepository armorRepository;
     private final EquipSkillRepository equipSkillRepository;
     private final CharmRepository charmRepository;
     private final DecorationRepository decorationRepository;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 추천 요청 진입점
-     *
-     * 현재 흐름:
-     * 1) 사용자가 선택한 set skill 조건을 만족하는 armor bundle 생성
-     * 2) 남은 armor 부위를 일반 스킬 점수 기준으로 채워 5부위 완성
-     * 3) 완성된 armor bundle에 charm 후보 부착
-     * 4) 최종 armor 5부위 기준으로 선택 set skill 조건 재검증
-     * 5) 장식주 실제 배치 가능 여부 검사
-     * 6) 통과한 candidate를 카드 응답으로 변환
-     */
     @Override
     public RecommendResultResponse recommend(RecommendRequest request) {
         List<SetSkillBundle> setSkillBundles = buildSetSkillBundles(request);
@@ -75,14 +75,8 @@ public class RecommendServiceImpl implements RecommendService {
         List<RecommendCandidate> feasibleCandidates = filterCandidatesByDecorationFeasibility(validatedCandidates, request);
         List<RecommendCardResponse> cards = buildRecommendCards(feasibleCandidates, request);
 
-        /**
-         * 조건을 만족하는 추천 결과가 하나도 없으면 예외를 던진다.
-         *
-         * 프론트에서는 이 메시지를 받아 사용자에게
-         * "조건을 만족하는 세팅이 없습니다" 형태로 보여주면 된다.
-         */
         if (cards.isEmpty()) {
-            throw new IllegalArgumentException("조건을 만족하는 세팅이 없습니다.");
+            throw new IllegalArgumentException(NO_RESULT_MESSAGE);
         }
 
         return RecommendResultResponse.builder()
@@ -90,16 +84,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .build();
     }
 
-    /**
-     * 사용자가 선택한 set skill(시리즈/그룹) 조건을 만족하는 armor bundle 생성
-     *
-     * 핵심 규칙:
-     * - 각 set skill 처리 시, 현재 bundle에 이미 포함된 armor가 해당 set skill에 몇 개 기여 중인지 먼저 계산
-     * - 이미 requiredCount를 만족했다면 추가 armor 없이 다음 조건으로 진행
-     * - 부족한 개수만큼만 새 armor를 조합해서 추가
-     * - 같은 armor가 여러 set skill에 동시에 기여 가능
-     * - 같은 부위 armor 중복 장착은 불가
-     */
+    /** 선택한 세트 스킬 조건을 만족하는 기본 방어구 묶음을 만든다. */
     private List<SetSkillBundle> buildSetSkillBundles(RecommendRequest request) {
         List<SelectedSetSkillRequest> setSkills = request.getSetSkills();
 
@@ -127,9 +112,7 @@ public class RecommendServiceImpl implements RecommendService {
         return result;
     }
 
-    /**
-     * 선택된 set skill 목록을 순서대로 만족시키는 bundle 조합 생성
-     */
+    /** 세트 스킬 조건을 순서대로 만족시키며 조합을 확장한다. */
     private void buildSetSkillBundlesRecursive(
             List<SelectedSetSkillRequest> setSkills,
             int setSkillIndex,
@@ -137,7 +120,7 @@ public class RecommendServiceImpl implements RecommendService {
             List<SetSkillBundle> result,
             Map<String, List<Armor>> setSkillArmorMap
     ) {
-        if (result.size() >= 50) {
+        if (result.size() >= MAX_SET_BUNDLE_COUNT) {
             return;
         }
 
@@ -189,14 +172,7 @@ public class RecommendServiceImpl implements RecommendService {
         );
     }
 
-    /**
-     * 현재 set skill 조건에서 부족한 개수만큼만 armor를 추가로 채운다.
-     *
-     * 규칙:
-     * - 이미 bundle에 있는 armor는 중복 추가하지 않는다.
-     * - 같은 부위 armor 중복 장착은 불가
-     * - 필요한 수만큼만 채우면 다음 set skill로 넘어간다.
-     */
+    /** 현재 세트 스킬에서 부족한 개수만큼만 방어구를 추가한다. */
     private void addArmorsForRemainingRequirement(
             List<Armor> candidateArmors,
             SelectedSetSkillRequest currentSetSkillRequest,
@@ -208,7 +184,7 @@ public class RecommendServiceImpl implements RecommendService {
             List<SetSkillBundle> result,
             Map<String, List<Armor>> setSkillArmorMap
     ) {
-        if (result.size() >= 50) {
+        if (result.size() >= MAX_SET_BUNDLE_COUNT) {
             return;
         }
 
@@ -257,9 +233,7 @@ public class RecommendServiceImpl implements RecommendService {
         }
     }
 
-    /**
-     * 현재 bundle 안에 있는 armor 중 특정 set skill에 기여하는 armor 수 계산
-     */
+    /** 현재 번들 안에서 해당 세트 스킬에 기여하는 방어구 수를 센다. */
     private int countMatchedArmorsForSetSkill(SetSkillBundle bundle, List<Armor> candidateArmors) {
         Set<String> candidateArmorIds = candidateArmors.stream()
                 .map(Armor::getId)
@@ -274,9 +248,7 @@ public class RecommendServiceImpl implements RecommendService {
         return count;
     }
 
-    /**
-     * 세트 조건 bundle을 기준으로 비어 있는 armor 부위를 채워 5부위 완성
-     */
+    /** 비어 있는 부위를 채워 5부위 방어구를 완성한다. */
     private List<SetSkillBundle> completeBundlesWithRemainingParts(
             List<SetSkillBundle> baseBundles,
             RecommendRequest request
@@ -295,17 +267,15 @@ public class RecommendServiceImpl implements RecommendService {
             fillMissingParts(baseBundle, missingParts, 0, request, completed);
             result.addAll(completed);
 
-            if (result.size() >= 20) {
-                return result.stream().limit(20).toList();
+            if (result.size() >= MAX_COMPLETED_BUNDLE_COUNT) {
+                return result.stream().limit(MAX_COMPLETED_BUNDLE_COUNT).toList();
             }
         }
 
-        return result.stream().limit(20).toList();
+        return result.stream().limit(MAX_COMPLETED_BUNDLE_COUNT).toList();
     }
 
-    /**
-     * 현재 bundle에서 비어 있는 armor 부위 반환
-     */
+    /** 아직 채워지지 않은 방어구 부위를 반환한다. */
     private List<EquipCategory> getMissingArmorParts(SetSkillBundle bundle) {
         List<EquipCategory> allArmorParts = List.of(
                 EquipCategory.HEAD,
@@ -320,12 +290,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .toList();
     }
 
-    /**
-     * 비어 있는 부위를 순서대로 채운다.
-     *
-     * 현재 단계에서는 일반 스킬 점수 기준 상위 armor를 사용한다.
-     * 최종 set skill 유효성은 이후 별도 검증 단계에서 다시 확인한다.
-     */
+    /** 비어 있는 부위를 순서대로 채운다. */
     private void fillMissingParts(
             SetSkillBundle currentBundle,
             List<EquipCategory> missingParts,
@@ -338,7 +303,7 @@ public class RecommendServiceImpl implements RecommendService {
             return;
         }
 
-        if (result.size() >= 10) {
+        if (result.size() >= MAX_FILLED_BUNDLE_PER_BASE) {
             return;
         }
 
@@ -363,15 +328,13 @@ public class RecommendServiceImpl implements RecommendService {
                     result
             );
 
-            if (result.size() >= 10) {
+            if (result.size() >= MAX_FILLED_BUNDLE_PER_BASE) {
                 return;
             }
         }
     }
 
-    /**
-     * 특정 부위 armor 후보 중 일반 스킬 요청과 잘 맞는 armor를 점수화
-     */
+    /** 부위별 상위 방어구 후보를 점수순으로 가져온다. */
     private List<ArmorCandidate> getTopArmorCandidatesForPart(
             EquipCategory part,
             RecommendRequest request
@@ -383,9 +346,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .toList();
     }
 
-    /**
-     * armor 하나가 사용자의 일반 스킬 요청에 얼마나 잘 맞는지 점수 계산
-     */
+    /** 방어구의 일반 스킬 기여도를 계산한다. */
     private int calculateArmorScore(Armor armor, RecommendRequest request) {
         List<SelectedNormalSkillRequest> normalSkills = request.getNormalSkills();
 
@@ -403,7 +364,7 @@ public class RecommendServiceImpl implements RecommendService {
         for (SelectedNormalSkillRequest requestedSkill : normalSkills) {
             for (EquipSkill armorSkill : armorSkills) {
                 if (armorSkill.getSkill().getId().equals(requestedSkill.getSkillId())) {
-                    score += armorSkill.getSkillLevel() * 10;
+                    score += armorSkill.getSkillLevel() * ARMOR_SKILL_WEIGHT;
                 }
             }
         }
@@ -411,13 +372,7 @@ public class RecommendServiceImpl implements RecommendService {
         return score;
     }
 
-    /**
-     * 완성된 armor bundle들에 대해, 요청 스킬과 잘 맞는 charm 후보를 붙인다.
-     *
-     * 현재 MVP 기준:
-     * - 각 bundle마다 상위 charm 몇 개만 사용
-     * - charm이 없어도 후보 하나는 만들기 위해 null 허용
-     */
+    /** 완성된 방어구 조합마다 호석 후보를 붙인다. */
     private List<RecommendCandidate> attachCharmCandidates(
             List<SetSkillBundle> bundles,
             RecommendRequest request
@@ -434,7 +389,7 @@ public class RecommendServiceImpl implements RecommendService {
             for (Charm charm : topCharms) {
                 result.add(new RecommendCandidate(bundle, charm));
 
-                if (result.size() >= 30) {
+                if (result.size() >= MAX_CANDIDATE_COUNT) {
                     return result;
                 }
             }
@@ -443,9 +398,7 @@ public class RecommendServiceImpl implements RecommendService {
         return result;
     }
 
-    /**
-     * 요청 일반 스킬과 잘 맞는 charm 상위 후보 조회
-     */
+    /** 일반 스킬 기준으로 상위 호석 후보를 조회한다. */
     private List<Charm> getTopCharmCandidates(RecommendRequest request) {
         return charmRepository.findAll().stream()
                 .map(charm -> new CharmScore(charm, calculateCharmScore(charm, request)))
@@ -455,9 +408,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .toList();
     }
 
-    /**
-     * charm 하나가 사용자의 일반 스킬 요청에 얼마나 잘 맞는지 점수 계산
-     */
+    /** 호석의 일반 스킬 기여도를 계산한다. */
     private int calculateCharmScore(Charm charm, RecommendRequest request) {
         List<SelectedNormalSkillRequest> normalSkills = request.getNormalSkills();
 
@@ -475,7 +426,7 @@ public class RecommendServiceImpl implements RecommendService {
         for (SelectedNormalSkillRequest requestedSkill : normalSkills) {
             for (EquipSkill charmSkill : charmSkills) {
                 if (charmSkill.getSkill().getId().equals(requestedSkill.getSkillId())) {
-                    score += charmSkill.getSkillLevel() * 15;
+                    score += charmSkill.getSkillLevel() * CHARM_SKILL_WEIGHT;
                 }
             }
         }
@@ -483,13 +434,7 @@ public class RecommendServiceImpl implements RecommendService {
         return score;
     }
 
-    /**
-     * 최종 candidate 기준으로 사용자가 선택한 모든 set skill 조건을 다시 검증한다.
-     *
-     * 중요:
-     * - buildSetSkillBundles()에서 한 번 만족했다고 끝내지 않는다.
-     * - armor 5부위가 모두 완성된 뒤, 실제 최종 armor 조합 기준으로 다시 계산한다.
-     */
+    /** 최종 장비 기준으로 세트 스킬 조건을 다시 검증한다. */
     private List<RecommendCandidate> filterCandidatesBySelectedSetSkillValidation(
             List<RecommendCandidate> candidates,
             RecommendRequest request
@@ -513,9 +458,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .toList();
     }
 
-    /**
-     * candidate가 사용자가 선택한 모든 set skill 조건을 만족하는지 검사
-     */
+    /** 후보가 모든 세트 스킬 조건을 만족하는지 확인한다. */
     private boolean satisfiesAllSelectedSetSkills(
             RecommendCandidate candidate,
             List<SelectedSetSkillRequest> setSkills,
@@ -546,9 +489,7 @@ public class RecommendServiceImpl implements RecommendService {
         return true;
     }
 
-    /**
-     * armor + charm이 제공하는 현재 일반 스킬 총합 계산
-     */
+    /** 현재 장비 조합이 제공하는 일반 스킬 레벨을 합산한다. */
     private Map<String, Integer> calculateCurrentSkillLevels(RecommendCandidate candidate) {
         Map<String, Integer> currentSkillLevels = new HashMap<>();
 
@@ -582,9 +523,7 @@ public class RecommendServiceImpl implements RecommendService {
         return currentSkillLevels;
     }
 
-    /**
-     * 요청 일반 스킬 대비 현재 candidate의 부족 레벨 계산
-     */
+    /** 요청 대비 부족한 일반 스킬 레벨을 계산한다. */
     private List<SkillGap> calculateSkillGaps(RecommendCandidate candidate, RecommendRequest request) {
         List<SelectedNormalSkillRequest> normalSkills = request.getNormalSkills();
 
@@ -613,14 +552,7 @@ public class RecommendServiceImpl implements RecommendService {
         return gaps;
     }
 
-    /**
-     * 현재 bundle의 실제 사용 가능한 슬롯 개수 계산
-     *
-     * slot1Lv / slot2Lv / slot3Lv는 각 슬롯 칸의 레벨값으로 본다.
-     * - 1이면 1슬롯 1개
-     * - 2면 2슬롯 1개
-     * - 3이면 3슬롯 1개
-     */
+    /** 방어구 번들의 슬롯 개수를 집계한다. */
     private SlotCounts calculateAvailableSlotCounts(SetSkillBundle bundle) {
         int slot1Count = 0;
         int slot2Count = 0;
@@ -647,9 +579,7 @@ public class RecommendServiceImpl implements RecommendService {
         return new SlotCounts(slot1Count, slot2Count, slot3Count);
     }
 
-    /**
-     * 부족한 일반 스킬을 장식주 슬롯 수요로 변환
-     */
+    /** 부족한 스킬을 슬롯 수요로 변환한다. */
     private SlotDemand calculateSlotDemand(RecommendCandidate candidate, RecommendRequest request) {
         List<SkillGap> gaps = calculateSkillGaps(candidate, request);
         Map<String, Integer> decorationSlotLevelMap = getDecorationSlotLevelMap();
@@ -683,13 +613,7 @@ public class RecommendServiceImpl implements RecommendService {
         return new SlotDemand(needSlot1, needSlot2, needSlot3);
     }
 
-    /**
-     * 스킬별 장식주 최소 슬롯 레벨 조회
-     *
-     * 예:
-     * 어떤 스킬이 2슬롯 장식주와 3슬롯 장식주 둘 다 있으면
-     * 최소 요구 슬롯인 2를 기록한다.
-     */
+    /** 스킬별 최소 장식주 슬롯 레벨을 구한다. */
     private Map<String, Integer> getDecorationSlotLevelMap() {
         List<EquipSkill> decorationSkills = equipSkillRepository.findByEquipType(EquipType.DECORATION);
 
@@ -718,12 +642,7 @@ public class RecommendServiceImpl implements RecommendService {
         return skillMinSlotMap;
     }
 
-    /**
-     * 스킬별 대표 장식주 조회
-     *
-     * 현재 MVP 기준:
-     * - 각 스킬에 대해 최소 슬롯으로 장착 가능한 장식주 1개를 대표 후보로 선택한다.
-     */
+    /** 스킬별 대표 장식주를 고른다. */
     private Map<String, DecorationCandidate> getBestDecorationCandidateMap() {
         List<EquipSkill> decorationSkills = equipSkillRepository.findByEquipType(EquipType.DECORATION);
 
@@ -762,14 +681,7 @@ public class RecommendServiceImpl implements RecommendService {
         return result;
     }
 
-    /**
-     * 현재 candidate가 장식주로 실제 충족 가능한지 판정
-     *
-     * 판정 조건:
-     * 1) need3 <= slot3
-     * 2) need2 + need3 <= slot2 + slot3
-     * 3) need1 + need2 + need3 <= slot1 + slot2 + slot3
-     */
+    /** 현재 후보가 장식주로 마무리 가능한지 검사한다. */
     private boolean canSatisfyWithDecorations(RecommendCandidate candidate, RecommendRequest request) {
         SlotCounts slots = calculateAvailableSlotCounts(candidate.getArmorBundle());
         SlotDemand demand = calculateSlotDemand(candidate, request);
@@ -793,24 +705,18 @@ public class RecommendServiceImpl implements RecommendService {
         return need1 + need2 + need3 <= slot1 + slot2 + slot3;
     }
 
-    /**
-     * set skill 검증까지 통과한 candidate 중 장식주로 실제 완성 가능한 후보만 남긴다.
-     */
+    /** 장식주 배치가 가능한 후보만 남긴다. */
     private List<RecommendCandidate> filterCandidatesByDecorationFeasibility(
             List<RecommendCandidate> candidates,
             RecommendRequest request
     ) {
         return candidates.stream()
                 .filter(candidate -> canSatisfyWithDecorations(candidate, request))
-                .limit(10)
+                .limit(MAX_CARD_COUNT)
                 .toList();
     }
 
-    /**
-     * 완성 candidate를 카드 응답으로 변환
-     *
-     * 현재는 장식주 배치 후 남는 슬롯 여유가 많은 후보를 우선으로 정렬한다.
-     */
+    /** 후보를 카드 응답으로 변환한다. */
     private List<RecommendCardResponse> buildRecommendCards(
             List<RecommendCandidate> candidates,
             RecommendRequest request
@@ -820,18 +726,12 @@ public class RecommendServiceImpl implements RecommendService {
                         calculateRemainingSlotScore(b, request),
                         calculateRemainingSlotScore(a, request)
                 ))
-                .limit(10)
+                .limit(MAX_CARD_COUNT)
                 .map(candidate -> toRecommendCardResponse(candidate, request))
                 .toList();
     }
-    /**
-     * 후보의 남는 슬롯 여유를 점수화한다.
-     *
-     * 가중치:
-     * - 3슬롯 여유 > 2슬롯 여유 > 1슬롯 여유
-     *
-     * 현재는 단순 정렬용 점수로 사용한다.
-     */
+
+    /** 남는 슬롯 여유를 점수화한다. */
     private int calculateRemainingSlotScore(RecommendCandidate candidate, RecommendRequest request) {
         SlotCounts totalSlots = getTotalAvailableSlots(candidate);
         SlotDemand demand = calculateSlotDemand(candidate, request);
@@ -843,15 +743,7 @@ public class RecommendServiceImpl implements RecommendService {
         return remainSlot1 + (remainSlot2 * 2) + (remainSlot3 * 3);
     }
 
-    /**
-     * RecommendCandidate 하나를 카드 응답 하나로 변환
-     *
-     * 현재 카드 상세에는 아래 정보가 포함된다.
-     * - 장비 목록
-     * - 장식주 배치 결과
-     * - 최종 스킬 목록
-     * - 방어력 / 원소 저항
-     */
+    /** 추천 후보 하나를 카드 응답으로 변환한다. */
     private RecommendCardResponse toRecommendCardResponse(
             RecommendCandidate candidate,
             RecommendRequest request
@@ -874,12 +766,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .build();
     }
 
-    /**
-     * armor 목록을 EquipDetailResponse 목록으로 변환
-     *
-     * 표시 순서:
-     * 머리 -> 몸통 -> 팔 -> 허리 -> 다리 -> 호석
-     */
+    /** 장비 목록을 응답 형식으로 변환한다. */
     private List<EquipDetailResponse> buildEquipDetails(RecommendCandidate candidate) {
         List<Armor> sortedArmors = candidate.getArmorBundle().getArmors().stream()
                 .sorted((a, b) -> Integer.compare(getEquipOrder(a.getCategory()), getEquipOrder(b.getCategory())))
@@ -927,15 +814,7 @@ public class RecommendServiceImpl implements RecommendService {
         };
     }
 
-    /**
-     * 카드 상세 영역 생성
-     *
-     * 현재 포함 정보:
-     * - equips: 장비/호석 목록
-     * - decorations: 실제 장식주 배치 결과
-     * - finalSkills: armor + charm + decoration 합산 최종 스킬
-     * - stats: 방어력 및 5속성 저항
-     */
+    /** 카드 상세 정보를 조립한다. */
     private RecommendDetailResponse buildRecommendDetail(
             List<EquipDetailResponse> equips,
             List<DecorationDetailResponse> decorations,
@@ -950,24 +829,12 @@ public class RecommendServiceImpl implements RecommendService {
                 .build();
     }
 
-    /**
-     * 카드 제목 생성
-     *
-     * 현재는 장식주 배치 후 남는 슬롯 정보만 표시한다.
-     * (세트 스킬은 이미 필터 단계에서 보장되므로 별도 표시하지 않는다)
-     */
+    /** 카드 제목을 만든다. */
     private String makeCardTitle(RecommendCandidate candidate, RecommendRequest request) {
         return buildRemainingSlotSummary(candidate, request);
     }
 
-    /**
-     * armor의 실제 슬롯을 장식주 배치용 슬롯 목록으로 변환한다.
-     *
-     * 처리 순서:
-     * - armor를 표시 순서대로 정렬
-     * - 각 armor의 slot1Lv / slot2Lv / slot3Lv를 실제 슬롯 1칸으로 변환
-     * - 높은 슬롯부터 먼저 사용하도록 내림차순 정렬
-     */
+    /** 장착 가능한 슬롯 목록을 만든다. */
     private List<AvailableSlot> buildAvailableSlots(RecommendCandidate candidate) {
         List<Armor> sortedArmors = candidate.getArmorBundle().getArmors().stream()
                 .sorted((a, b) -> Integer.compare(getEquipOrder(a.getCategory()), getEquipOrder(b.getCategory())))
@@ -987,23 +854,14 @@ public class RecommendServiceImpl implements RecommendService {
         return slots;
     }
 
-    /**
-     * slotLevel이 실제 슬롯 하나를 의미할 때만 배치 가능 슬롯 목록에 추가한다.
-     */
+    /** 유효한 슬롯만 목록에 추가한다. */
     private void addSlotIfPresent(List<AvailableSlot> slots, String part, int slotLevel) {
         if (slotLevel >= 1 && slotLevel <= 3) {
             slots.add(new AvailableSlot(part, slotLevel));
         }
     }
 
-    /**
-     * 요청 스킬 부족분을 실제 장식주 배치 결과로 변환한다.
-     *
-     * 현재 규칙:
-     * - 부족한 스킬만 대상으로 한다.
-     * - 높은 슬롯 장식주부터 먼저 배치한다.
-     * - 실제 사용 가능한 armor 슬롯에만 배치한다.
-     */
+    /** 부족한 스킬을 실제 장식주 배치 결과로 변환한다. */
     private List<DecorationDetailResponse> buildDecorationDetails(
             RecommendCandidate candidate,
             RecommendRequest request
@@ -1077,9 +935,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .toList();
     }
 
-    /**
-     * 요구 슬롯 레벨 이상을 수용할 수 있는 첫 번째 미사용 슬롯을 반환한다.
-     */
+    /** 요구 슬롯 이상을 수용할 수 있는 첫 번째 빈 슬롯을 찾는다. */
     private AvailableSlot findUsableSlot(List<AvailableSlot> slots, int requiredSlotLevel) {
         for (AvailableSlot slot : slots) {
             if (!slot.isUsed() && slot.getSlotLevel() >= requiredSlotLevel) {
@@ -1089,16 +945,7 @@ public class RecommendServiceImpl implements RecommendService {
         return null;
     }
 
-    /**
-     * 최종 스킬 목록 생성
-     *
-     * 합산 대상:
-     * - armor 기본 스킬
-     * - charm 기본 스킬
-     * - 실제 배치된 decoration 스킬
-     *
-     * 현재는 동일 스킬명 기준으로 레벨을 합산한다.
-     */
+    /** 최종 스킬 목록을 만든다. */
     private List<FinalSkillResponse> buildFinalSkills(
             RecommendCandidate candidate,
             List<DecorationDetailResponse> decorations
@@ -1153,16 +1000,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .toList();
     }
 
-    /**
-     * 최종 추천 후보의 방어 스탯 계산
-     *
-     * 계산 대상:
-     * - defense: armor 5부위의 물리 방어력 합
-     * - fire/water/thunder/ice/dragon: armor의 elementals JSON 합산
-     *
-     * 주의:
-     * - charm / decoration은 방어 스탯 계산에서 제외한다.
-     */
+    /** 방어력과 속성 저항을 계산한다. */
     private DefenseStatResponse calculateDefenseStats(RecommendCandidate candidate) {
         int defense = 0;
         int fireRes = 0;
@@ -1193,24 +1031,7 @@ public class RecommendServiceImpl implements RecommendService {
                 .build();
     }
 
-    /**
-     * armor.elementals JSON 문자열을 파싱하여 속성 저항 맵으로 변환
-     *
-     * 지원 형태 예시:
-     * 1) 배열 형태
-     * [
-     *   {"element_type":"fire","value":2},
-     *   {"element_type":"water","value":-1}
-     * ]
-     *
-     * 2) object 내부 elementals 배열
-     * {"elementals":[...]}
-     *
-     * 3) 단순 object 형태
-     * {"fire":2,"water":-1,"thunder":0,"ice":1,"dragon":0}
-     *
-     * 파싱 실패 시에는 빈 맵을 반환한다.
-     */
+    /** elementals JSON을 내부 저항 맵으로 변환한다. */
     private Map<String, Integer> parseElementalResistances(String elementalsJson) {
         Map<String, Integer> result = new HashMap<>();
 
@@ -1249,9 +1070,7 @@ public class RecommendServiceImpl implements RecommendService {
         return result;
     }
 
-    /**
-     * elementals 배열 내부 원소 저항 1건을 누적한다.
-     */
+    /** 배열형 원소 저항 값을 누적한다. */
     private void mergeElementalValue(Map<String, Integer> result, JsonNode node) {
         if (node == null || !node.isObject()) {
             return;
@@ -1266,25 +1085,14 @@ public class RecommendServiceImpl implements RecommendService {
         result.merge(elementType, value, Integer::sum);
     }
 
-    /**
-     * 단순 object 형태의 원소 저항 필드를 누적한다.
-     */
+    /** 객체형 원소 저항 값을 누적한다. */
     private void mergeDirectElementalField(Map<String, Integer> result, JsonNode root, String key) {
         if (root.has(key) && root.get(key).canConvertToInt()) {
             result.merge(key, root.get(key).asInt(), Integer::sum);
         }
     }
 
-    /**
-     * 원소 타입명을 내부 표준 키로 정규화한다.
-     *
-     * 반환 키:
-     * - fire
-     * - water
-     * - thunder
-     * - ice
-     * - dragon
-     */
+    /** 원소 타입명을 내부 키로 정규화한다. */
     private String normalizeElementType(JsonNode node) {
         String rawType = null;
 
@@ -1312,15 +1120,7 @@ public class RecommendServiceImpl implements RecommendService {
         };
     }
 
-    /**
-     * 원소 저항 수치를 추출한다.
-     *
-     * 지원 필드:
-     * - value
-     * - resistance
-     *
-     * raw 데이터에 negative 플래그가 있으면 음수 처리도 반영한다.
-     */
+    /** 원소 저항 수치를 추출한다. */
     private int extractElementalValue(JsonNode node) {
         int value = 0;
 
@@ -1339,21 +1139,12 @@ public class RecommendServiceImpl implements RecommendService {
 
     private record CharmScore(Charm charm, int score) {}
 
-    /**
-     * 현재 후보의 전체 슬롯 수 계산
-     *
-     * 반환값:
-     * - slot1: 1슬롯 개수
-     * - slot2: 2슬롯 개수
-     * - slot3: 3슬롯 개수
-     */
+    /** 후보의 전체 슬롯 수를 반환한다. */
     private SlotCounts getTotalAvailableSlots(RecommendCandidate candidate) {
         return calculateAvailableSlotCounts(candidate.getArmorBundle());
     }
-    /**
-     * 장식주 배치 후 남는 슬롯 정보를 문자열로 반환한다.
 
-     */
+    /** 장식주 배치 후 남는 슬롯 요약 문자열을 만든다. */
     private String buildRemainingSlotSummary(RecommendCandidate candidate, RecommendRequest request) {
         SlotCounts totalSlots = getTotalAvailableSlots(candidate);
         SlotDemand demand = calculateSlotDemand(candidate, request);

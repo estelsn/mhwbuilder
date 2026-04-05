@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "mhwbuilder-desktop",
+  "version": "0.1.0",
+  "identifier": "io.mhwbuilder.app",
+  "build": {
+  "beforeDevCommand": "../../mhwbuilder-backend/run.command",
+  "devUrl": "http://localhost:8080",
+  "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "MHW Builder",
+        "width": 1280,
+        "height": 900,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "externalBin": [
+      "binaries/mhwb-backend"
+    ],
+    "resources": {
+      "../../../mhwbuilder-backend/app.jar": "backend/app.jar",
+      "../../../mhwbuilder-backend/runtime/": "backend/runtime/"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

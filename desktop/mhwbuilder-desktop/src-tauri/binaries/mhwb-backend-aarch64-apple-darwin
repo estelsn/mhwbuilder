@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+RESOURCE_DIR="$APP_DIR/Resources"
+
+JAVA_BIN="$RESOURCE_DIR/backend/runtime/bin/java"
+JAR_PATH="$RESOURCE_DIR/backend/app.jar"
+
+WORK_DIR="$HOME/Library/Application Support/MHWBuilder"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+exec "$JAVA_BIN" -jar "$JAR_PATH"

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { requestRecommendation } from "../api/recommendApi";
 import {
   buildRecommendRequest,
   calculateTotalNormalSkillValue,
@@ -23,7 +24,7 @@ function LeftPanel({ onRecommend = () => {} }) {
   const toastTimerRef = useRef(null);
 
   useEffect(() => {
-    fetch("http://localhost:8080/api/skills/select-page")
+    fetch("/api/skills/select-page")
       .then((res) => {
         if (!res.ok) {
           throw new Error("스킬 데이터를 불러오지 못했습니다.");
@@ -34,7 +35,7 @@ function LeftPanel({ onRecommend = () => {} }) {
         setSkillData(data);
       })
       .catch(() => {
-        alert("스킬 데이터를 불러오는 중 오류가 발생했습니다.");
+        showToast("스킬 데이터를 불러오는 중 오류가 발생했습니다.", "error");
       });
   }, []);
 
@@ -161,7 +162,7 @@ function LeftPanel({ onRecommend = () => {} }) {
     const validation = validateRecommendationInput(selectedTags);
 
     if (!validation.valid) {
-      alert(validation.message);
+      showToast(validation.message, "error");
       return;
     }
 
@@ -170,25 +171,12 @@ function LeftPanel({ onRecommend = () => {} }) {
     try {
       setIsSubmitting(true);
 
-      const response = await fetch("http://localhost:8080/api/recommend", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "추천 요청에 실패했습니다.");
-      }
-
-      const data = await response.json();
+      const data = await requestRecommendation(requestBody);
 
       onRecommend(data);
-      showToast("추천 결과를 불러왔습니다.");
+      showToast("추천 결과를 불러왔습니다.", "success");
     } catch (error) {
-      alert(error.message || "추천 요청 중 오류가 발생했습니다.");
+      showToast(error.message || "추천 요청 중 오류가 발생했습니다.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -197,7 +185,7 @@ function LeftPanel({ onRecommend = () => {} }) {
   const resetFilters = () => {
     if (isSubmitting) return;
     setSelectedTags([]);
-    showToast("선택한 스킬을 초기화했습니다.");
+    showToast("선택한 스킬을 초기화했습니다.", "success");
   };
 
   const setSkillTags = selectedTags.filter(

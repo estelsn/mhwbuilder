@@ -1,6 +1,9 @@
 # Monster Hunter Wilds Set Builder
 몬스터 헌터 와일즈 장비 세팅 추천 시스템
 
+스킬 조건을 기반으로 실제 게임에서 구현 가능한 장비 조합을 계산하는 추천 엔진
+
+
 ---
 
 ## 1. 프로젝트 개요
@@ -138,10 +141,23 @@
 
 ---
 
-## 8. 프로젝트 구조
+## 8. 실행 화면
+
+### 초기 화면
+![메인 화면](./images/main.png)
+
+### 추천 결과
+![추천 결과](./images/result.png)
+
+### 상세 보기
+![상세 보기](./images/detail.png)
+
+---
+
+## 9. 프로젝트 구조
 
 ### Backend
-👉 [백엔드 README 보기](./mhwbuilder-backend/README.md)
+ [백엔드 README](./mhwbuilder-backend/README.md)
 
 ### Frontend
-👉 [프론트 README 보기](./mhwbuilder-frontend/README.md)
+ [프론트 README](./mhwbuilder-frontend/README.md)
